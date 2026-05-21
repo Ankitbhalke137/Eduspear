@@ -108,6 +108,25 @@ function saveMessageToLog(scope, messageData) {
   });
 }
 
+// --- Secure Admin Database View Endpoint (Bypasses Free Tier Shell restriction) ---
+app.get('/api/admin/database', (req, res) => {
+  const { secret } = req.query;
+  // A simple, customizable secret passphrase to secure the data
+  if (secret === 'admin123') {
+    return res.json({
+      success: true,
+      registeredUsersCount: Object.keys(registeredUsers).length,
+      users: registeredUsers,
+      globalHistory,
+      directChats: Object.fromEntries(directMessageHistories)
+    });
+  }
+  return res.status(403).json({ 
+    success: false, 
+    error: 'Unauthorized. Pass ?secret=admin123 in the URL to view the database.' 
+  });
+});
+
 // Fallback routing for React
 app.use((req, res, next) => {
   if (req.method === 'GET' && !req.path.startsWith('/socket.io')) {
@@ -560,24 +579,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// --- Secure Admin Database View Endpoint (Bypasses Free Tier Shell restriction) ---
-app.get('/api/admin/database', (req, res) => {
-  const { secret } = req.query;
-  // A simple, customizable secret passphrase to secure the data
-  if (secret === 'admin123') {
-    return res.json({
-      success: true,
-      registeredUsersCount: Object.keys(registeredUsers).length,
-      users: registeredUsers,
-      globalHistory,
-      directChats: Object.fromEntries(directMessageHistories)
-    });
-  }
-  return res.status(403).json({ 
-    success: false, 
-    error: 'Unauthorized. Pass ?secret=admin123 in the URL to view the database.' 
-  });
-});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, '0.0.0.0', () => {
