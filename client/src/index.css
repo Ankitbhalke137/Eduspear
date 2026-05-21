@@ -13,7 +13,8 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background-color: #030712; /* Deep space-black */
   color: #f3f4f6;
-  height: 100vh;
+  height: 100vh; /* Fallback for browsers that do not support Custom Properties */
+  height: 100dvh;
   display: flex;
   justify-content: center;
   align-items: center;
