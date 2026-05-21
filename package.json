@@ -1,0 +1,20 @@
+{
+  "name": "edusphere-workspace",
+  "version": "1.0.0",
+  "description": "EduSphere - Campus WiFi Student Collaboration & Learning Hub",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "build": "cd client && npm run build"
+  },
+  "keywords": [
+    "education",
+    "chat",
+    "encrypted",
+    "e2ee",
+    "wifi",
+    "local-network"
+  ],
+  "author": "",
+  "license": "ISC"
+}

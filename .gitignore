@@ -1,0 +1,15 @@
+# Dependency directories
+node_modules/
+client/node_modules/
+
+# Local databases & logs
+server/db_users.json
+server/db_chats.json
+server/chat_history.log
+
+# Build files
+client/build/
+
+# Operating system files
+.DS_Store
+Thumbs.db
