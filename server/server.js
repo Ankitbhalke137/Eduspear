@@ -23,9 +23,11 @@ const io = new Server(server, {
 });
 
 // --- File-Based Persistence Paths ---
-const DB_USERS_PATH = path.join(__dirname, 'db_users.json');
-const DB_CHATS_PATH = path.join(__dirname, 'db_chats.json');
-const LOG_FILE = path.join(__dirname, 'chat_history.log');
+// Auto-detect Render's persistent disk path at /var/data, fallback to local directory
+const dataDir = fs.existsSync('/var/data') ? '/var/data' : __dirname;
+const DB_USERS_PATH = path.join(dataDir, 'db_users.json');
+const DB_CHATS_PATH = path.join(dataDir, 'db_chats.json');
+const LOG_FILE = path.join(dataDir, 'chat_history.log');
 
 // --- Load Persisted Data ---
 function loadJSON(filePath, defaultValue) {
