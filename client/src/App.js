@@ -998,6 +998,11 @@ function App() {
         <div className="rate-limit-warning-bar">⚠️ {rateLimitWarning}</div>
       )}
 
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+      )}
+
       {/* Sidebar Tabs */}
       <div className={`chat-sidebar ${isSidebarOpen ? 'active' : ''}`}>
         <div className="sidebar-header">
