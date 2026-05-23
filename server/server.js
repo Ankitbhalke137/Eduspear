@@ -519,23 +519,25 @@ io.on('connection', (socket) => {
   });
 
   // --- Multiplayer Game Signaling ---
-  socket.on('game_invite', ({ targetUsername }) => {
+  socket.on('game_invite', ({ targetUsername, gameType }) => {
     if (!currentUser) return;
     const targetUser = Array.from(activeUsers.values()).find(u => u.username === targetUsername);
     if (targetUser) {
       io.to(targetUser.socketId).emit('game_invite_received', {
         from: currentUser,
-        socketId: socket.id
+        socketId: socket.id,
+        gameType
       });
     }
   });
 
-  socket.on('game_invite_response', ({ senderSocketId, accepted }) => {
+  socket.on('game_invite_response', ({ senderSocketId, accepted, gameType }) => {
     if (!currentUser) return;
     io.to(senderSocketId).emit('game_invite_result', {
       from: currentUser,
       accepted,
-      opponentSocketId: socket.id
+      opponentSocketId: socket.id,
+      gameType
     });
   });
 

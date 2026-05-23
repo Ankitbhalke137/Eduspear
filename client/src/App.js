@@ -115,15 +115,21 @@ function App() {
   const [codeContent, setCodeContent] = useState('');
   const [codeLanguage, setCodeLanguage] = useState('javascript');
 
-  // Multiplayer Game States (Tic-Tac-Toe)
+  // Multiplayer Game States (Shared)
+  const [activeGameType, setActiveGameType] = useState('tictactoe');
   const [gameInvite, setGameInvite] = useState(null);
   const [gameOpponentSocketId, setGameOpponentSocketId] = useState(null);
   const [opponentName, setOpponentName] = useState('');
   const [gameStatus, setGameStatus] = useState('idle');
-  const [board, setBoard] = useState(Array(9).fill(null));
   const [isMyTurn, setIsMyTurn] = useState(false);
   const [mySymbol, setMySymbol] = useState('X');
   const [gameResult, setGameResult] = useState('');
+  
+  // Game-specific boards
+  const [board, setBoard] = useState(Array(9).fill(null));
+  const [connect4Board, setConnect4Board] = useState(Array(42).fill(null));
+  const [rpsMyMove, setRpsMyMove] = useState(null);
+  const [rpsOpponentMove, setRpsOpponentMove] = useState(null);
   
   // Trivia States
   const [currentTriviaIdx, setCurrentTriviaIdx] = useState(0);
@@ -162,6 +168,38 @@ function App() {
       setGameResult('draw');
     }
   }, [mySymbol]);
+
+  const checkConnect4Winner = useCallback((newBoard) => {
+    const cols = 7;
+    const rows = 6;
+    const checkLine = (a, b, c, d) => {
+      if (newBoard[a] && newBoard[a] === newBoard[b] && newBoard[a] === newBoard[c] && newBoard[a] === newBoard[d]) {
+        setGameResult(newBoard[a] === mySymbol ? 'wins' : 'loss');
+        return true;
+      }
+      return false;
+    };
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (c < cols - 3 && checkLine(r*cols+c, r*cols+c+1, r*cols+c+2, r*cols+c+3)) return;
+        if (r < rows - 3 && checkLine(r*cols+c, (r+1)*cols+c, (r+2)*cols+c, (r+3)*cols+c)) return;
+        if (c < cols - 3 && r < rows - 3 && checkLine(r*cols+c, (r+1)*cols+c+1, (r+2)*cols+c+2, (r+3)*cols+c+3)) return;
+        if (c >= 3 && r < rows - 3 && checkLine(r*cols+c, (r+1)*cols+c-1, (r+2)*cols+c-2, (r+3)*cols+c-3)) return;
+      }
+    }
+    if (newBoard.every(cell => cell !== null)) setGameResult('draw');
+  }, [mySymbol]);
+
+  const checkRpsWinner = useCallback((myMove, oppMove) => {
+    if (myMove === oppMove) { setGameResult('draw'); return; }
+    if ((myMove === 'Rock' && oppMove === 'Scissors') ||
+        (myMove === 'Paper' && oppMove === 'Rock') ||
+        (myMove === 'Scissors' && oppMove === 'Paper')) {
+      setGameResult('wins');
+    } else {
+      setGameResult('loss');
+    }
+  }, []);
 
   // Connection listeners
   useEffect(() => {
@@ -406,19 +444,24 @@ function App() {
       }
     });
 
-    socket.on('game_invite_received', ({ from, socketId }) => {
-      setGameInvite({ from, socketId });
+    socket.on('game_invite_received', ({ from, socketId, gameType }) => {
+      setGameInvite({ from, socketId, gameType: gameType || 'tictactoe' });
       setActiveTab('games');
     });
 
-    socket.on('game_invite_result', ({ from, accepted, opponentSocketId }) => {
+    socket.on('game_invite_result', ({ from, accepted, opponentSocketId, gameType }) => {
       if (accepted) {
+        const type = gameType || 'tictactoe';
         setGameOpponentSocketId(opponentSocketId);
         setOpponentName(from);
         setGameStatus('playing');
+        setActiveGameType(type);
         setBoard(Array(9).fill(null));
+        setConnect4Board(Array(42).fill(null));
+        setRpsMyMove(null);
+        setRpsOpponentMove(null);
         setIsMyTurn(true);
-        setMySymbol('X');
+        setMySymbol(type === 'connect4' ? 'Red' : 'X');
         setGameResult('');
       } else {
         alert(`${from} declined your invitation to play.`);
@@ -428,12 +471,23 @@ function App() {
 
     socket.on('game_update', ({ action, state }) => {
       if (action === 'move') {
-        setBoard(state.board);
-        setIsMyTurn(true);
-        checkWinner(state.board);
+        if (state.board) {
+          setBoard(state.board);
+          setIsMyTurn(true);
+          checkWinner(state.board);
+        } else if (state.connect4Board) {
+          setConnect4Board(state.connect4Board);
+          setIsMyTurn(true);
+          checkConnect4Winner(state.connect4Board);
+        } else if (state.rpsMove) {
+          setRpsOpponentMove(state.rpsMove);
+        }
       } else if (action === 'reset') {
         setBoard(Array(9).fill(null));
-        setIsMyTurn(mySymbol === 'X');
+        setConnect4Board(Array(42).fill(null));
+        setRpsMyMove(null);
+        setRpsOpponentMove(null);
+        setIsMyTurn(mySymbol === 'X' || mySymbol === 'Red');
         setGameResult('');
       } else if (action === 'quit') {
         alert(`Your opponent left the game.`);
@@ -455,7 +509,13 @@ function App() {
       socket.off('game_invite_result');
       socket.off('game_update');
     };
-  }, [isJoined, lobbyCryptoKey, directKeys, onlineUsers, myKeyPair, mySymbol, username, checkWinner]);
+  }, [isJoined, lobbyCryptoKey, directKeys, onlineUsers, myKeyPair, mySymbol, username, checkWinner, checkConnect4Winner]);
+
+  useEffect(() => {
+    if (activeGameType === 'rps' && rpsMyMove && rpsOpponentMove && !gameResult) {
+      checkRpsWinner(rpsMyMove, rpsOpponentMove);
+    }
+  }, [rpsMyMove, rpsOpponentMove, activeGameType, gameResult, checkRpsWinner]);
 
   // Scroll viewport down
   useEffect(() => {
@@ -776,23 +836,29 @@ function App() {
   };
 
   // --- Multiplayer Game Mechanics ---
-  const inviteToGame = (user) => {
+  const inviteToGame = (user, type = 'tictactoe') => {
     if (user.username === username) return;
     setGameStatus('invited');
     setOpponentName(user.username);
-    socket.emit('game_invite', { targetUsername: user.username });
+    setActiveGameType(type);
+    socket.emit('game_invite', { targetUsername: user.username, gameType: type });
   };
 
   const acceptGameInvite = () => {
     if (!gameInvite) return;
+    const type = gameInvite.gameType || 'tictactoe';
     setGameOpponentSocketId(gameInvite.socketId);
     setOpponentName(gameInvite.from);
     setGameStatus('playing');
+    setActiveGameType(type);
     setBoard(Array(9).fill(null));
+    setConnect4Board(Array(42).fill(null));
+    setRpsMyMove(null);
+    setRpsOpponentMove(null);
     setIsMyTurn(false);
-    setMySymbol('O');
+    setMySymbol(type === 'connect4' ? 'Yellow' : 'O');
     setGameResult('');
-    socket.emit('game_invite_response', { senderSocketId: gameInvite.socketId, accepted: true });
+    socket.emit('game_invite_response', { senderSocketId: gameInvite.socketId, accepted: true, gameType: type });
     setGameInvite(null);
   };
 
@@ -812,11 +878,39 @@ function App() {
     checkWinner(newBoard);
   };
 
+  const handleConnect4Click = (col) => {
+    if (!isMyTurn || gameResult || !gameOpponentSocketId) return;
+    // Find bottom-most empty row in this col
+    let emptyRow = -1;
+    for (let r = 5; r >= 0; r--) {
+      if (!connect4Board[r * 7 + col]) {
+        emptyRow = r;
+        break;
+      }
+    }
+    if (emptyRow === -1) return; // Column is full
+    const newBoard = [...connect4Board];
+    newBoard[emptyRow * 7 + col] = mySymbol;
+    setConnect4Board(newBoard);
+    setIsMyTurn(false);
+    socket.emit('game_action', { opponentSocketId: gameOpponentSocketId, action: 'move', state: { connect4Board: newBoard } });
+    checkConnect4Winner(newBoard);
+  };
+
+  const handleRpsClick = (move) => {
+    if (rpsMyMove || gameResult || !gameOpponentSocketId) return;
+    setRpsMyMove(move);
+    socket.emit('game_action', { opponentSocketId: gameOpponentSocketId, action: 'move', state: { rpsMove: move } });
+  };
+
   const requestGameReset = () => {
     if (!gameOpponentSocketId) return;
     socket.emit('game_action', { opponentSocketId: gameOpponentSocketId, action: 'reset' });
     setBoard(Array(9).fill(null));
-    setIsMyTurn(mySymbol === 'X');
+    setConnect4Board(Array(42).fill(null));
+    setRpsMyMove(null);
+    setRpsOpponentMove(null);
+    setIsMyTurn(mySymbol === 'X' || mySymbol === 'Red');
     setGameResult('');
   };
 
@@ -1093,14 +1187,21 @@ function App() {
                     onlineUsers.filter(u => u.username !== username).map((user, idx) => (
                       <div key={idx} className="peer-invite-item">
                         <span>{user.username}</span>
-                        <button className="invite-btn" onClick={() => inviteToGame(user)}>Invite 🎮</button>
+                        <div className="invite-actions" style={{ display: 'flex', gap: '8px' }}>
+                          <button className="invite-btn" onClick={() => inviteToGame(user, 'tictactoe')} title="Tic-Tac-Toe">❌</button>
+                          <button className="invite-btn" onClick={() => inviteToGame(user, 'connect4')} title="Connect 4">🔴</button>
+                          <button className="invite-btn" onClick={() => inviteToGame(user, 'rps')} title="Rock Paper Scissors">✌️</button>
+                        </div>
                       </div>
                     ))
                   )}
                 </div>
                 {gameInvite && (
                   <div className="received-invite-card">
-                    <p>🎮 <strong>{gameInvite.from}</strong> invited you to Tic-Tac-Toe!</p>
+                    <p>🎮 <strong>{gameInvite.from}</strong> invited you to play {
+                      gameInvite.gameType === 'connect4' ? 'Connect 4' : 
+                      gameInvite.gameType === 'rps' ? 'Rock Paper Scissors' : 'Tic-Tac-Toe'
+                    }!</p>
                     <div className="invite-card-actions">
                       <button className="accept-btn" onClick={acceptGameInvite}>Accept</button>
                       <button className="decline-btn" onClick={declineGameInvite}>Decline</button>
@@ -1117,7 +1218,7 @@ function App() {
               </div>
             )}
 
-            {gameStatus === 'playing' && (
+            {gameStatus === 'playing' && activeGameType === 'tictactoe' && (
               <div className="tictactoe-container">
                 <div className="game-header">
                   <span>Match: <strong>{opponentName}</strong> ({mySymbol === 'X' ? 'O' : 'X'})</span>
@@ -1144,6 +1245,84 @@ function App() {
                     >{cell}</button>
                   ))}
                 </div>
+                {gameResult && <button className="game-reset-btn" onClick={requestGameReset}>Play Again</button>}
+              </div>
+            )}
+
+            {gameStatus === 'playing' && activeGameType === 'connect4' && (
+              <div className="connect4-container">
+                <div className="game-header">
+                  <span>Match: <strong>{opponentName}</strong> ({mySymbol === 'Red' ? 'Yellow' : 'Red'})</span>
+                  <button className="quit-btn" onClick={quitGame}>Quit</button>
+                </div>
+                <div className="turn-indicator">
+                  {gameResult ? (
+                    <span className="result-indicator-text">
+                      {gameResult === 'wins' && '🎉 You Won!'}
+                      {gameResult === 'loss' && '💔 You Lost.'}
+                      {gameResult === 'draw' && '⚖️ Match Draw.'}
+                    </span>
+                  ) : (
+                    <span>{isMyTurn ? '🟢 Your Turn' : '🔴 Opponent\'s Turn'}</span>
+                  )}
+                </div>
+                <div className="connect4-board">
+                  {connect4Board.map((cell, idx) => (
+                    <div
+                      key={idx}
+                      className="connect4-cell-wrapper"
+                      onClick={() => handleConnect4Click(idx % 7)}
+                    >
+                      <div className={`connect4-cell ${cell ? (cell === mySymbol ? 'mine' : 'theirs') : ''}`}></div>
+                    </div>
+                  ))}
+                </div>
+                {gameResult && <button className="game-reset-btn" onClick={requestGameReset}>Play Again</button>}
+              </div>
+            )}
+
+            {gameStatus === 'playing' && activeGameType === 'rps' && (
+              <div className="rps-container">
+                <div className="game-header">
+                  <span>Match: <strong>{opponentName}</strong></span>
+                  <button className="quit-btn" onClick={quitGame}>Quit</button>
+                </div>
+                <div className="turn-indicator">
+                  {gameResult ? (
+                    <span className="result-indicator-text">
+                      {gameResult === 'wins' && '🎉 You Won!'}
+                      {gameResult === 'loss' && '💔 You Lost.'}
+                      {gameResult === 'draw' && '⚖️ Match Draw.'}
+                    </span>
+                  ) : (
+                    <span>{!rpsMyMove ? '✋ Choose your move' : '⏳ Waiting for opponent...'}</span>
+                  )}
+                </div>
+                
+                <div className="rps-moves-display">
+                  <div className="rps-move-box mine">
+                    <h4>You</h4>
+                    <span className="rps-move-emoji">
+                      {rpsMyMove === 'Rock' ? '✊' : rpsMyMove === 'Paper' ? '✋' : rpsMyMove === 'Scissors' ? '✌️' : '❓'}
+                    </span>
+                  </div>
+                  <div className="rps-vs">VS</div>
+                  <div className="rps-move-box theirs">
+                    <h4>{opponentName}</h4>
+                    <span className="rps-move-emoji">
+                      {gameResult ? (rpsOpponentMove === 'Rock' ? '✊' : rpsOpponentMove === 'Paper' ? '✋' : rpsOpponentMove === 'Scissors' ? '✌️' : '❓') : (rpsOpponentMove ? '✅' : '❓')}
+                    </span>
+                  </div>
+                </div>
+
+                {!gameResult && !rpsMyMove && (
+                  <div className="rps-controls">
+                    <button className="rps-btn" onClick={() => handleRpsClick('Rock')}>✊ Rock</button>
+                    <button className="rps-btn" onClick={() => handleRpsClick('Paper')}>✋ Paper</button>
+                    <button className="rps-btn" onClick={() => handleRpsClick('Scissors')}>✌️ Scissors</button>
+                  </div>
+                )}
+                
                 {gameResult && <button className="game-reset-btn" onClick={requestGameReset}>Play Again</button>}
               </div>
             )}
@@ -1301,14 +1480,25 @@ function App() {
                         {activeChat === 'global' ? (
                           msg.readBy && msg.readBy.filter(u => u !== username).length > 0 && (
                             <span className="read-receipt-tag" title={`Read by: ${msg.readBy.filter(u => u !== username).join(', ')}`}>
-                              ✓✓ Read ({msg.readBy.filter(u => u !== username).length})
+                              <svg viewBox="0 0 18 18" width="16" height="16" fill="#34B7F1" style={{ verticalAlign: 'middle', marginRight: '4px' }}>
+                                <path d="M17.394 5.035l-.57-.444a.434.434 0 0 0-.609.076l-6.39 8.198a.38.38 0 0 1-.577.039l-.427-.388a.381.381 0 0 0-.578.038l-.451.576a.497.497 0 0 0 .043.645l1.575 1.51c.171.167.43.149.577-.039l7.483-9.602a.436.436 0 0 0-.076-.609zm-4.892 0l-.57-.444a.434.434 0 0 0-.609.076l-6.39 8.198a.38.38 0 0 1-.577.039l-2.614-2.556a.435.435 0 0 0-.614.007l-.505.516a.435.435 0 0 0 .007.614l3.887 3.8c.171.167.43.149.577-.039l7.483-9.602a.435.435 0 0 0-.076-.609z"></path>
+                              </svg>
+                              <span style={{ fontSize: '0.75rem', verticalAlign: 'middle' }}>{msg.readBy.filter(u => u !== username).length}</span>
                             </span>
                           )
                         ) : (
                           msg.readBy && msg.readBy.includes(activeChat.username) ? (
-                            <span className="read-receipt-tag read" title="Read by recipient">✓✓ Read</span>
+                            <span className="read-receipt-tag read" title="Read by recipient">
+                              <svg viewBox="0 0 18 18" width="16" height="16" fill="#34B7F1" style={{ verticalAlign: 'middle' }}>
+                                <path d="M17.394 5.035l-.57-.444a.434.434 0 0 0-.609.076l-6.39 8.198a.38.38 0 0 1-.577.039l-.427-.388a.381.381 0 0 0-.578.038l-.451.576a.497.497 0 0 0 .043.645l1.575 1.51c.171.167.43.149.577-.039l7.483-9.602a.436.436 0 0 0-.076-.609zm-4.892 0l-.57-.444a.434.434 0 0 0-.609.076l-6.39 8.198a.38.38 0 0 1-.577.039l-2.614-2.556a.435.435 0 0 0-.614.007l-.505.516a.435.435 0 0 0 .007.614l3.887 3.8c.171.167.43.149.577-.039l7.483-9.602a.435.435 0 0 0-.076-.609z"></path>
+                              </svg>
+                            </span>
                           ) : (
-                            <span className="read-receipt-tag" title="Sent, unread">✓ Sent</span>
+                            <span className="read-receipt-tag" title="Sent, unread">
+                              <svg viewBox="0 0 18 18" width="16" height="16" fill="#94a3b8" style={{ verticalAlign: 'middle' }}>
+                                <path d="M16.143 4.296l-.57-.444a.434.434 0 0 0-.609.076l-6.39 8.198a.38.38 0 0 1-.577.039l-2.614-2.556a.435.435 0 0 0-.614.007l-.505.516a.435.435 0 0 0 .007.614l3.887 3.8c.171.167.43.149.577-.039l7.483-9.602a.435.435 0 0 0-.076-.609z"></path>
+                              </svg>
+                            </span>
                           )
                         )}
                       </>
@@ -1341,7 +1531,9 @@ function App() {
           <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} accept="image/*,video/*,application/pdf,.doc,.docx,.zip,.rar,.txt" />
           <form onSubmit={handleSendMessage} className="input-bar">
             <div className="input-left-actions">
-              <button type="button" className="input-icon-btn-minimal" onClick={() => fileInputRef.current?.click()} title="Upload file" disabled={isUploading || connectionStatus !== 'connected'}>@</button>
+              <button type="button" className="input-icon-btn-minimal" onClick={() => fileInputRef.current?.click()} title="Upload file" disabled={isUploading || connectionStatus !== 'connected'}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+              </button>
               <button type="button" className="input-icon-btn-minimal" onClick={() => setIsCodeModalOpen(true)} title="Share code" disabled={connectionStatus !== 'connected'}>&lt;/&gt;</button>
             </div>
             <div className="input-center-form">
