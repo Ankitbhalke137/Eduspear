@@ -694,6 +694,8 @@ h6 {
 }
 
 .user-item-avatar.channel-avatar {
+  width: 44px;
+  height: 44px;
   background: rgba(45, 140, 255, 0.15);
   color: var(--neon-cyan);
   border-radius: 10px;
@@ -1213,11 +1215,11 @@ h6 {
 }
 
 .chat-header-icon-container {
-  width: 40px;
-  height: 40px;
+  width: 48px;
+  height: 48px;
   background: rgba(45, 140, 255, 0.15);
   color: var(--neon-cyan);
-  border-radius: 10px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
