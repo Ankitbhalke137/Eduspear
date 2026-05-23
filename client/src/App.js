@@ -13,6 +13,7 @@ import {
   decryptPrivateKey
 } from './crypto';
 import './App.css';
+import edusphereLogo from './edusphere-logo.png';
 
 // Dynamic backend url detection
 const getBackendUrl = () => {
@@ -878,7 +879,7 @@ function App() {
       <div className="login-screen">
         <div className="login-header-banner">
           <div className="login-logo-container">
-            <div className="edusphere-logo-icon">🪐</div>
+            <img src={edusphereLogo} alt="EduSphere Logo" style={{ width: '70px', height: '70px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }} />
             <h1>EduSphere</h1>
           </div>
         </div>
@@ -899,7 +900,7 @@ function App() {
       <div className="login-screen">
         <div className="login-header-banner">
           <div className="login-logo-container">
-            <div className="edusphere-logo-icon">🪐</div>
+            <img src={edusphereLogo} alt="EduSphere Logo" style={{ width: '70px', height: '70px', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.3)' }} />
             <h1>EduSphere</h1>
           </div>
         </div>
@@ -1006,23 +1007,22 @@ function App() {
       {/* Sidebar Tabs */}
       <div className={`chat-sidebar ${isSidebarOpen ? 'active' : ''}`}>
         <div className="sidebar-header">
-          <div className="user-profile">
-            <div className="user-avatar" style={{ backgroundColor: userColor }}>
+          <div className="user-profile-card">
+            <div className="user-avatar" style={{ backgroundColor: '#00E676', color: '#0a0e17' }}>
               {username.charAt(0).toUpperCase()}
+              <div className="user-online-dot"></div>
             </div>
             <div className="user-details">
               <span className="user-name-title">{username}</span>
               <span className="user-status-subtitle">Active Student</span>
             </div>
-          </div>
-          <div className="sidebar-header-actions">
-            <button className="sidebar-action-btn logout-btn" onClick={handleLogout} title="Log Out">
-              ⏻
+            <button className="logout-btn-minimal" onClick={handleLogout} title="Log Out">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
             </button>
-            {isSidebarOpen && (
-              <button className="sidebar-action-btn" onClick={() => setIsSidebarOpen(false)}>✕</button>
-            )}
           </div>
+          {isSidebarOpen && (
+            <button className="sidebar-close-btn" onClick={() => setIsSidebarOpen(false)}>✕</button>
+          )}
         </div>
 
         <div className="sidebar-tabs-nav">
@@ -1033,20 +1033,31 @@ function App() {
 
         {activeTab === 'people' && (
           <div className="users-list">
-            <div className="online-users-title">Channels</div>
+            <div className="online-users-title">CHANNELS</div>
             <div 
               className={`user-item ${activeChat === 'global' ? 'active-chat-item' : ''}`} 
               onClick={openGlobalLobby}
               style={{ cursor: 'pointer' }}
             >
-              <div className="user-item-avatar" style={{ backgroundColor: '#6366f1' }}>🌐</div>
+              <div className="user-item-avatar channel-avatar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+              </div>
               <div className="user-item-info">
-                <span className="user-item-name" style={{ fontWeight: '700' }}>Global Lobby Chat</span>
+                <span className="user-item-name">Global Lobby Chat</span>
                 <span className="user-item-status">Open to everyone</span>
               </div>
             </div>
 
-            <div className="online-users-title" style={{ marginTop: '10px' }}>Direct Messages ({onlineUsers.filter(u => u.username !== username).length})</div>
+            <div className="online-users-title" style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>DIRECT MESSAGES <span className="dm-count">({onlineUsers.filter(u => u.username !== username).length})</span></span>
+              <button className="add-dm-btn">+</button>
+            </div>
+            
+            {onlineUsers.filter(u => u.username !== username).length === 0 && (
+              <div style={{ padding: '0 20px', color: 'var(--text-muted)', fontStyle: 'italic', fontSize: '0.8rem', marginTop: '10px' }}>
+                No direct messages yet.
+              </div>
+            )}
             {onlineUsers.filter(u => u.username !== username).map((user, idx) => {
               const isActive = activeChat !== 'global' && activeChat.username === user.username;
               return (
@@ -1200,6 +1211,11 @@ function App() {
             </div>
           </div>
         )}
+        
+        <div className="sidebar-footer-encryption">
+          <p>AES-256 Bit Encryption Active.</p>
+          <p className="footer-link">Learn about our <a href="#security">Security Protocol</a>.</p>
+        </div>
       </div>
 
       {/* Main Chat Area */}
@@ -1207,18 +1223,23 @@ function App() {
         <div className="chat-header">
           <div className="chat-header-info">
             <button className="sidebar-toggle-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>☰</button>
-            <div className="chat-header-avatar" style={{ backgroundColor: activeChat === 'global' ? '#6366f1' : (activeChat.avatarColor || '#00A884') }}>
-              {activeChat === 'global' ? '🌐' : activeChat.username.charAt(0).toUpperCase()}
+            <div className="chat-header-icon-container">
+              <div className="chat-header-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+              </div>
             </div>
             <div className="chat-header-text">
               <span className="chat-room-name">{activeChat === 'global' ? 'Global Lobby Chat' : `Chat with ${activeChat.username}`}</span>
               <span className="chat-room-status">
-                <span className={`status-dot ${connectionStatus}`}></span>
-                {connectionStatus === 'connected' ? 'Secure Encrypted Connection' : 'Offline'}
+                <span className="status-dot-green"></span>
+                Secure Encrypted Connection
               </span>
             </div>
           </div>
-          <span className="e2ee-badge">{activeChat === 'global' ? '🔒 Shared E2EE' : '🔒 Direct E2EE (ECDH)'}</span>
+          <div className="e2ee-badge-minimal">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            <span>Shared E2EE</span>
+          </div>
         </div>
 
         <div className="chat-messages-container">
@@ -1233,6 +1254,11 @@ function App() {
             const isOwnMessage = msg.user === username;
             return (
               <div key={msg.id} className={`msg-wrapper ${isOwnMessage ? 'sent' : 'received'}`}>
+                {!isOwnMessage && (
+                  <div className="msg-avatar" style={{ backgroundColor: msg.avatarColor || '#34B7F1' }} title={msg.user}>
+                    {msg.user.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div className="msg-bubble">
                   {!isOwnMessage && (
                     <span className="msg-bubble-user" style={{ color: msg.avatarColor || '#34B7F1' }}>{msg.user}</span>
@@ -1289,6 +1315,11 @@ function App() {
                     )}
                   </div>
                 </div>
+                {isOwnMessage && (
+                  <div className="msg-avatar mine" style={{ backgroundColor: userColor || '#8B5CF6' }} title="You">
+                    {username.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -1309,16 +1340,16 @@ function App() {
         <div className="input-bar-wrapper">
           <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} accept="image/*,video/*,application/pdf,.doc,.docx,.zip,.rar,.txt" />
           <form onSubmit={handleSendMessage} className="input-bar">
-            <button type="button" className="input-icon-btn" onClick={() => fileInputRef.current?.click()} title="Upload file or video (Max 10MB)" disabled={isUploading || connectionStatus !== 'connected'}>📎</button>
-            <button type="button" className="input-icon-btn" onClick={() => setIsCodeModalOpen(true)} title="Share programming code" disabled={connectionStatus !== 'connected'}>&lt;/&gt;</button>
-            <div className="input-form">
-              <div className="chat-input-wrapper">
-                <input type="text" className="chat-input" placeholder={isUploading ? "Encrypting and uploading file..." : "Type an encrypted message..."} value={message} onChange={handleInputChange} disabled={isUploading || connectionStatus !== 'connected'} />
-              </div>
-              <button type="submit" className={`send-btn ${message.trim() ? 'active' : ''}`} disabled={!message.trim() || connectionStatus !== 'connected' || isUploading}>
-                <svg className="send-icon-svg" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
-              </button>
+            <div className="input-left-actions">
+              <button type="button" className="input-icon-btn-minimal" onClick={() => fileInputRef.current?.click()} title="Upload file" disabled={isUploading || connectionStatus !== 'connected'}>@</button>
+              <button type="button" className="input-icon-btn-minimal" onClick={() => setIsCodeModalOpen(true)} title="Share code" disabled={connectionStatus !== 'connected'}>&lt;/&gt;</button>
             </div>
+            <div className="input-center-form">
+              <input type="text" className="chat-input-minimal" placeholder={isUploading ? "Encrypting..." : "Type an encrypted message..."} value={message} onChange={handleInputChange} disabled={isUploading || connectionStatus !== 'connected'} />
+            </div>
+            <button type="submit" className={`send-btn-circular ${message.trim() ? 'active' : ''}`} disabled={!message.trim() || connectionStatus !== 'connected' || isUploading}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
           </form>
         </div>
       </div>
